@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(pam-http VERSION 1.0.0)
+project(pam-http VERSION 1.0.1)
 
 option(WITH_UNITTEST "Add unittests and its dependencies into configuration")
 

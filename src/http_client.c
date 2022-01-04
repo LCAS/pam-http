@@ -20,7 +20,7 @@ static void set_options(HttpSession* session, HttpOptions* options) {
         if (clientCert->cert && clientCert->key) {
             curl_easy_setopt(session->curl, CURLOPT_SSLCERT, clientCert->cert);
             curl_easy_setopt(session->curl, CURLOPT_SSLKEY, clientCert->key);
-            //curl_easy_setopt(session->curl, CURLOPT_SSL_VERIFYHOST, 0L); /* verify the certificate's name against host. TODO add option to disable? */
+            curl_easy_setopt(session->curl, CURLOPT_SSL_VERIFYHOST, 0L); /* verify the certificate's name against host. TODO add option to disable? */
         }
         if (options->cacert) {
             curl_easy_setopt(session->curl, CURLOPT_CAINFO, options->cacert);

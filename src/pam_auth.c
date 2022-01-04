@@ -11,9 +11,13 @@
 #include "pam-http/http_auth.h"
 
 #define ENDLINE "\n"
+#define DEBUG
+
+#include <syslog.h>
 
 #ifdef DEBUG
-#define PAM_DEBUG(fmt...) fprintf(stderr, "DEBUG: " fmt);
+//#define PAM_DEBUG(fmt...) fprintf(stderr, "DEBUG: " fmt); syslog(LOG_AUTH|LOG_DEBUG, "pam-http: " fmt);
+#define PAM_DEBUG(fmt...) syslog(LOG_AUTH|LOG_DEBUG, "pam-http: " fmt);
 #else
 #define PAM_DEBUG(fmt...)
 #endif
@@ -33,6 +37,19 @@ static PamStatus get_service_name(pam_handle_t *pamh, const char** serviceName) 
     if (retval != PAM_SUCCESS || serviceName == NULL || *serviceName == NULL) {
         status = PAM_AUTHINFO_UNAVAIL;
         PAM_DEBUG("Service name lookup failed" ENDLINE);
+    } else {
+        status = PAM_SUCCESS;
+    }
+    return status;
+}
+
+static PamStatus get_rhost(pam_handle_t *pamh, const char** rhost) {
+    PamStatus status;
+
+    int retval = pam_get_item(pamh, PAM_RHOST, (const void **) rhost);
+    if (retval != PAM_SUCCESS || rhost == NULL || *rhost == NULL) {
+        status = PAM_AUTHINFO_UNAVAIL;
+        PAM_DEBUG("rhost lookup failed. This shouldn't be a problem though." ENDLINE);
     } else {
         status = PAM_SUCCESS;
     }
@@ -64,9 +81,9 @@ static PamStatus get_user_id(pam_handle_t *pamh, const char* userName, char* use
     return status;
 }
 
-static PamStatus authenticate_user(const Options* options, const char* userId, const char* serviceName) {
+static PamStatus authenticate_user(const Options* options, const char* userId, const char* serviceName, const char* username, const char* rhost) {
     PamStatus status;
-    AuthResponse* resp = http_auth_authenticate(options, &(AuthContext){userId, serviceName});
+    AuthResponse* resp = http_auth_authenticate(options, &(AuthContext){userId, serviceName, username, rhost});
     if (resp->status == AUTH_AUTHORIZED) {
         status = PAM_SUCCESS;
     } else if (resp->status == AUTH_UNAUTHORIZED) {
@@ -85,6 +102,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
                                    int argc, const char **argv) {
     const char* userName = NULL;
     const char* serviceName = NULL;
+    const char* rhost = NULL;
     char userId[12];  // Max 10 characters for 32bit value.
     
     PamStatus statusCode = get_service_name(pamh, &serviceName);
@@ -95,8 +113,17 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
         statusCode = get_user_id(pamh, userName, userId);
     }
     if (statusCode == PAM_SUCCESS) {
+        statusCode = get_rhost(pamh, &rhost);
+        if (statusCode != PAM_SUCCESS) {
+            rhost = "unknown";
+            statusCode = PAM_SUCCESS;
+        }
+    }
+
+    if (statusCode == PAM_SUCCESS) {
         Options* options = options_parse(&(Args){argv, argc});
-        statusCode = authenticate_user(options, userId, serviceName);
+        PAM_DEBUG("authenticate user %s for %s at %s " ENDLINE, userName, serviceName, rhost);
+        statusCode = authenticate_user(options, userId, serviceName, userName, rhost);
         options_free(options);
     }
     return statusCode;

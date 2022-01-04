@@ -13,6 +13,8 @@ extern "C" {
     typedef struct {
         const char* userId;
         const char* serviceName;
+        const char* username;
+        const char* host;
     } AuthContext;
 
     /**
